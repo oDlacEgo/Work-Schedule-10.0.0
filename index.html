@@ -143,8 +143,8 @@
                 <th>Name</th>
                 <th>Available</th>
                 <th>Shift</th>
+                <th>Assigned Stations</th>
                 <th>Action</th>
-                <th>Hours Worked</th> <!-- Nowa kolumna dla godzin pracy -->
             </tr>
         </thead>
         <tbody id="employeesList"></tbody>
@@ -175,21 +175,20 @@
         import { getDatabase, ref, set, get, update, remove } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
 
         const firebaseConfig = {
-		    apiKey: "AIzaSyDCfaPnIyh3pIpz9148ShBp82c_WYdENWQ",
-			authDomain: "work-schedule-10.firebaseapp.com",		
-			databaseURL: "https://work-schedule-10-default-rtdb.europe-west1.firebasedatabase.app",
-			projectId: "work-schedule-10",
-			storageBucket: "work-schedule-10.firebasestorage.app",
-			messagingSenderId: "110457889795",
-			appId: "1:110457889795:web:4d118b542ca26e27e59a36"
+            apiKey: "API_KEY",
+            authDomain: "work-schedule-dc5aa.firebaseapp.com",
+            databaseURL: "https://work-schedule-dc5aa-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "work-schedule-dc5aa",
+            storageBucket: "work-schedule-dc5aa.appspot.com",
+            messagingSenderId: "1027800982553",
+            appId: "APP_ID"
         };
 
         const app = initializeApp(firebaseConfig);
         const database = getDatabase(app);
 
-        let employees = [];
-        let stations = [];
-        let employeeHours = {}; // Przechowywanie godzin pracy pracowników
+        let employees = {};
+        let stations = {};
 
         function loadEmployees() {
             get(ref(database, 'employees')).then(snapshot => {
@@ -221,6 +220,31 @@
                         colorCell.style.color = 'white';
                         row.appendChild(colorCell);
 
+                        const stationCell = document.createElement('td');
+                        const assignedStations = Object.keys(stations)
+                            .filter(station => {
+                                for (let hour = 8; hour <= 19; hour++) {
+                                    const hourKey = `hour_${hour}`;
+                                    if (stations[station][hourKey] === employee) {
+                                        return true;
+                                    }
+                                }
+                                return false;
+                            })
+                            .map(station => {
+                                let hoursWorked = 0;
+                                for (let hour = 8; hour <= 19; hour++) {
+                                    const hourKey = `hour_${hour}`;
+                                    if (stations[station][hourKey] === employee) {
+                                        hoursWorked++;
+                                    }
+                                }
+                                return `${station}: ${hoursWorked} hour(s)`;
+                            })
+                            .join(', ');
+                        stationCell.textContent = assignedStations || 'No stations';
+                        row.appendChild(stationCell);
+
                         const actionCell = document.createElement('td');
                         const deleteButton = document.createElement('button');
                         deleteButton.textContent = 'Delete';
@@ -233,11 +257,6 @@
                         });
                         actionCell.appendChild(deleteButton);
                         row.appendChild(actionCell);
-
-                        // Nowa komórka do wyświetlania godzin pracy
-                        const hoursCell = document.createElement('td');
-                        hoursCell.textContent = employeeHours[employee] ? employeeHours[employee] : '0';
-                        row.appendChild(hoursCell);
 
                         employeesList.appendChild(row);
                     }
@@ -303,13 +322,6 @@
                                 nameField.style.color = 'white';
                                 nameField.addEventListener('click', () => removeAssignment(station, hourKey));
                                 hourCell.appendChild(nameField);
-
-                                // Zwiększanie liczby godzin pracy pracownika
-                                if (employeeHours[employeeName]) {
-                                    employeeHours[employeeName] += 1;
-                                } else {
-                                    employeeHours[employeeName] = 1;
-                                }
                             } else {
                                 const employeeDropdown = document.createElement('select');
                                 const emptyOption = document.createElement('option');
@@ -358,21 +370,19 @@
             const stationData = stations[station] || {};
             stationData[time] = employeeName;
 
-            set(ref(database, 'stations/' + station), stationData).then(() => loadStations());
+            set(ref(database, 'stations/' + station), stationData).then(() => {
+                loadStations();
+                loadEmployees();
+            });
         }
 
         function removeAssignment(station, time) {
             const stationData = stations[station] || {};
-            const employeeName = stationData[time];
-
-            if (employeeName) {
-                if (employeeHours[employeeName]) {
-                    employeeHours[employeeName] -= 1;
-                }
-            }
-
             delete stationData[time];
-            set(ref(database, 'stations/' + station), stationData).then(() => loadStations());
+            set(ref(database, 'stations/' + station), stationData).then(() => {
+                loadStations();
+                loadEmployees();
+            });
         }
 
         function deleteStation(station) {
