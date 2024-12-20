@@ -60,7 +60,7 @@
             font-size: 14px;
         }
         #employeeListTable {
-            width: 50%;
+            width: 30%;
         }
         #scheduleTable {
             width: 100%;
@@ -100,6 +100,11 @@
         #addEmployeeBtn {
             font-size: 10px;
             padding: 3px 8px;
+        }
+
+        .highlight {
+            background-color: red !important;
+            color: white !important;
         }
     </style>
 </head>
@@ -241,7 +246,19 @@
                                 return `${station}: ${hoursWorked}`;
                             })
                             .join(', ');
+
                         stationCell.textContent = assignedStations || 'No stations';
+
+                        // Adding the check for 5-12 hours in the assigned stations
+                        const hoursWorkedArray = assignedStations.split(', ').map(station => station.split(': ')[1]);
+                        const allHours = hoursWorkedArray.filter(hours => {
+                            return parseInt(hours) >= 5 && parseInt(hours) <= 12;
+                        });
+
+                        if (allHours.length > 0) {
+                            stationCell.classList.add('highlight');
+                        }
+
                         row.appendChild(stationCell);
 
                         const actionCell = document.createElement('td');
