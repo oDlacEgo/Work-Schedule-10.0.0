@@ -1,0 +1,7 @@
+    apiKey: "AIzaSyDCfaPnIyh3pIpz9148ShBp82c_WYdENWQ",
+    authDomain: "work-schedule-10.firebaseapp.com",
+    databaseURL: "https://work-schedule-10-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "work-schedule-10",
+    storageBucket: "work-schedule-10.firebasestorage.app",
+    messagingSenderId: "110457889795",
+    appId: "1:110457889795:web:4d118b542ca26e27e59a36"

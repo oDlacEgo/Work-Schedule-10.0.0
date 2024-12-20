@@ -25,6 +25,9 @@
             color: white;
             font-weight: bold;
         }
+        tr:first-child td {
+            background-color: #f9f9f9; /* Wyróżnij pierwszy wiersz */
+        }
         .button {
             padding: 1px 8px;
             cursor: pointer;
@@ -99,12 +102,6 @@
             font-size: 10px; /* Zmniejszenie czcionki w przycisku */
             padding: 3px 8px;
         }
-
-        .history {
-            font-size: 10px;
-            max-width: 200px;
-            word-wrap: break-word;
-        }
     </style>
 </head>
 <body>
@@ -146,8 +143,8 @@
                 <th>Name</th>
                 <th>Available</th>
                 <th>Shift</th>
-                <th>Work History</th>
                 <th>Action</th>
+                <th>Hours Worked</th> <!-- Nowa kolumna dla godzin pracy -->
             </tr>
         </thead>
         <tbody id="employeesList"></tbody>
@@ -178,13 +175,13 @@
         import { getDatabase, ref, set, get, update, remove } from "https://www.gstatic.com/firebasejs/11.1.0/firebase-database.js";
 
         const firebaseConfig = {
-            apiKey: "API_KEY",
-            authDomain: "work-schedule-dc5aa.firebaseapp.com",
-            databaseURL: "https://work-schedule-dc5aa-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "work-schedule-dc5aa",
-            storageBucket: "work-schedule-dc5aa.appspot.com",
-            messagingSenderId: "1027800982553",
-            appId: "APP_ID"
+		    apiKey: "AIzaSyDCfaPnIyh3pIpz9148ShBp82c_WYdENWQ",
+			authDomain: "work-schedule-10.firebaseapp.com",		
+			databaseURL: "https://work-schedule-10-default-rtdb.europe-west1.firebasedatabase.app",
+			projectId: "work-schedule-10",
+			storageBucket: "work-schedule-10.firebasestorage.app",
+			messagingSenderId: "110457889795",
+			appId: "1:110457889795:web:4d118b542ca26e27e59a36"
         };
 
         const app = initializeApp(firebaseConfig);
@@ -192,6 +189,7 @@
 
         let employees = [];
         let stations = [];
+        let employeeHours = {}; // Przechowywanie godzin pracy pracowników
 
         function loadEmployees() {
             get(ref(database, 'employees')).then(snapshot => {
@@ -223,16 +221,6 @@
                         colorCell.style.color = 'white';
                         row.appendChild(colorCell);
 
-                        const historyCell = document.createElement('td');
-                        const historyList = employees[employee].workHistory || [];
-                        historyList.forEach(history => {
-                            const historyItem = document.createElement('div');
-                            historyItem.classList.add('history');
-                            historyItem.textContent = `Station: ${history.station}, Time: ${history.time}`;
-                            historyCell.appendChild(historyItem);
-                        });
-                        row.appendChild(historyCell);
-
                         const actionCell = document.createElement('td');
                         const deleteButton = document.createElement('button');
                         deleteButton.textContent = 'Delete';
@@ -245,6 +233,11 @@
                         });
                         actionCell.appendChild(deleteButton);
                         row.appendChild(actionCell);
+
+                        // Nowa komórka do wyświetlania godzin pracy
+                        const hoursCell = document.createElement('td');
+                        hoursCell.textContent = employeeHours[employee] ? employeeHours[employee] : '0';
+                        row.appendChild(hoursCell);
 
                         employeesList.appendChild(row);
                     }
@@ -310,6 +303,13 @@
                                 nameField.style.color = 'white';
                                 nameField.addEventListener('click', () => removeAssignment(station, hourKey));
                                 hourCell.appendChild(nameField);
+
+                                // Zwiększanie liczby godzin pracy pracownika
+                                if (employeeHours[employeeName]) {
+                                    employeeHours[employeeName] += 1;
+                                } else {
+                                    employeeHours[employeeName] = 1;
+                                }
                             } else {
                                 const employeeDropdown = document.createElement('select');
                                 const emptyOption = document.createElement('option');
@@ -358,16 +358,19 @@
             const stationData = stations[station] || {};
             stationData[time] = employeeName;
 
-            // Update the employee's work history
-            const employeeData = employees[employeeName] || { workHistory: [] };
-            employeeData.workHistory.push({ station, time });
-
-            set(ref(database, 'stations/' + station), stationData);
-            set(ref(database, 'employees/' + employeeName), employeeData).then(() => loadStations());
+            set(ref(database, 'stations/' + station), stationData).then(() => loadStations());
         }
 
         function removeAssignment(station, time) {
             const stationData = stations[station] || {};
+            const employeeName = stationData[time];
+
+            if (employeeName) {
+                if (employeeHours[employeeName]) {
+                    employeeHours[employeeName] -= 1;
+                }
+            }
+
             delete stationData[time];
             set(ref(database, 'stations/' + station), stationData).then(() => loadStations());
         }
@@ -408,7 +411,7 @@
             const name = document.getElementById('employeeName').value;
             const color = document.getElementById('employeeColor').value;
             if (name && color) {
-                const employeeData = { available: true, color: color, workHistory: [] };
+                const employeeData = { available: true, color: color };
                 set(ref(database, 'employees/' + name), employeeData).then(loadEmployees);
             }
         });
