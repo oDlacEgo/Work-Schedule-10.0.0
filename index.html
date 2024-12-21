@@ -25,9 +25,6 @@
             color: white;
             font-weight: bold;
         }
-        tr:first-child td {
-            background-color: #f9f9f9;
-        }
         .button {
             padding: 1px 8px;
             cursor: pointer;
@@ -71,6 +68,7 @@
         #scheduleTable td, #scheduleTable th {
             padding: 2px;
             font-size: 10px;
+            white-space: nowrap;
         }
         #employeeListTable td, #employeeListTable th {
             padding: 3px;
@@ -163,9 +161,9 @@
         <label for="employeeName">Name:</label>
         <input type="text" id="employeeName" required>
 
-        <label for="employeeColor">Shift:</label>
+        <label for="employeeColor"></label>
         <select id="employeeColor" required>
-            <option value="green">Green</option>
+            <option value="green" selected>Green</option>
             <option value="blue">Blue</option>
             <option value="red">Red</option>
             <option value="purple">Purple</option>
@@ -278,10 +276,18 @@
             get(ref(database, 'stations')).then(snapshot => {
                 if (snapshot.exists()) {
                     stations = snapshot.val();
+
+                    // Sortowanie stacji według grup alfabetycznie
+                    const sortedStations = Object.keys(stations).sort((a, b) => {
+                        const groupA = stations[a].group?.toLowerCase() || '';
+                        const groupB = stations[b].group?.toLowerCase() || '';
+                        return groupA.localeCompare(groupB);
+                    });
+
                     const stationsList = document.getElementById('stationsList');
                     stationsList.innerHTML = '';
 
-                    for (const station in stations) {
+                    sortedStations.forEach(station => {
                         const row = document.createElement('tr');
                         const groupCell = document.createElement('td');
                         groupCell.textContent = stations[station].group || 'No Group';
@@ -324,7 +330,7 @@
                                     }
                                 }
 
-                                employeeDropdown.value = ''; 
+                                employeeDropdown.value = '';
                                 employeeDropdown.addEventListener('change', () => {
                                     const selectedEmployee = employeeDropdown.value;
                                     if (selectedEmployee) {
@@ -348,6 +354,9 @@
                         const limitButton = document.createElement('button');
                         limitButton.textContent = stations[station].limit || '0';
                         limitButton.classList.add('button');
+                        limitButton.style.width = '30px';
+                        limitButton.style.backgroundColor = '#f0f0f0';
+                        limitButton.style.color = 'black';
                         limitButton.addEventListener('click', () => {
                             const newLimit = parseInt(prompt(`Enter new limit for ${station}:`, stations[station].limit || 0), 10);
                             if (!isNaN(newLimit) && newLimit >= 0) {
@@ -360,7 +369,7 @@
                         row.appendChild(actionCell);
 
                         stationsList.appendChild(row);
-                    }
+                    });
                 }
             });
         }
