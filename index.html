@@ -106,6 +106,10 @@
             background-color: red !important;
             color: white !important;
         }
+        .highlight-orange {
+            background-color: orange !important;
+            color: white !important;
+        }
     </style>
 </head>
 <body>
@@ -249,16 +253,6 @@
 
                         stationCell.textContent = assignedStations || 'No stations';
 
-                        // Adding the check for 5-12 hours in the assigned stations
-                        const hoursWorkedArray = assignedStations.split(', ').map(station => station.split(': ')[1]);
-                        const allHours = hoursWorkedArray.filter(hours => {
-                            return parseInt(hours) >= 5 && parseInt(hours) <= 12;
-                        });
-
-                        if (allHours.length > 0) {
-                            stationCell.classList.add('highlight');
-                        }
-
                         row.appendChild(stationCell);
 
                         const actionCell = document.createElement('td');
@@ -287,54 +281,30 @@
                     const stationsList = document.getElementById('stationsList');
                     stationsList.innerHTML = '';
 
-                    const assignedEmployees = {}; 
-
-                    const sortedStations = Object.keys(stations)
-                        .sort((a, b) => {
-                            const groupA = stations[a].group || '';
-                            const groupB = stations[b].group || '';
-                            return groupA.localeCompare(groupB);
-                        })
-                        .reduce((sorted, key) => {
-                            sorted[key] = stations[key];
-                            return sorted;
-                        }, {});
-
-                    for (const station in sortedStations) {
-                        const stationData = sortedStations[station];
-                        for (let hour = 8; hour <= 19; hour++) {
-                            const hourKey = `hour_${hour}`;
-                            const employeeName = stationData[hourKey];
-                            if (employeeName) {
-                                if (!assignedEmployees[hour]) {
-                                    assignedEmployees[hour] = new Set();
-                                }
-                                assignedEmployees[hour].add(employeeName);
-                            }
-                        }
-                    }
-
-                    for (const station in sortedStations) {
+                    for (const station in stations) {
                         const row = document.createElement('tr');
                         const groupCell = document.createElement('td');
-                        groupCell.textContent = sortedStations[station].group || 'No Group';
+                        groupCell.textContent = stations[station].group || 'No Group';
                         row.appendChild(groupCell);
 
                         const stationCell = document.createElement('td');
                         stationCell.textContent = station;
                         row.appendChild(stationCell);
 
-                        const stationData = sortedStations[station];
+                        const stationData = stations[station];
                         for (let hour = 8; hour <= 19; hour++) {
                             const hourCell = document.createElement('td');
                             const hourKey = `hour_${hour}`;
                             const employeeName = stationData[hourKey];
 
                             if (employeeName) {
-                                const employeeColor = employees[employeeName]?.color || 'transparent';
+                                const employeeAssignments = Object.values(stationData).filter(name => name === employeeName).length;
+                                const limit = stationData.limit || 0;
+
                                 const nameField = document.createElement('div');
                                 nameField.textContent = employeeName;
-                                nameField.style.backgroundColor = employeeColor;
+                                nameField.style.cursor = 'pointer';
+                                nameField.style.backgroundColor = employeeAssignments > limit ? 'orange' : employees[employeeName]?.color || 'transparent';
                                 nameField.style.color = 'white';
                                 nameField.addEventListener('click', () => removeAssignment(station, hourKey));
                                 hourCell.appendChild(nameField);
@@ -346,7 +316,7 @@
                                 employeeDropdown.appendChild(emptyOption);
 
                                 for (const employee in employees) {
-                                    if (employees[employee].available && !assignedEmployees[hour]?.has(employee)) {
+                                    if (employees[employee].available && !isAssignedToHour(employee, hour)) {
                                         const option = document.createElement('option');
                                         option.value = employee;
                                         option.textContent = employee;
@@ -374,12 +344,33 @@
                         deleteButton.classList.add('button');
                         deleteButton.addEventListener('click', () => deleteStation(station));
                         actionCell.appendChild(deleteButton);
+
+                        const limitButton = document.createElement('button');
+                        limitButton.textContent = stations[station].limit || '0';
+                        limitButton.classList.add('button');
+                        limitButton.addEventListener('click', () => {
+                            const newLimit = parseInt(prompt(`Enter new limit for ${station}:`, stations[station].limit || 0), 10);
+                            if (!isNaN(newLimit) && newLimit >= 0) {
+                                stations[station].limit = newLimit;
+                                set(ref(database, 'stations/' + station), stations[station]).then(loadStations);
+                            }
+                        });
+                        actionCell.appendChild(limitButton);
+
                         row.appendChild(actionCell);
 
                         stationsList.appendChild(row);
                     }
                 }
             });
+        }
+
+        function isAssignedToHour(employee, hour) {
+            return Object.values(stations).some(station =>
+                Object.entries(station).some(([key, value]) =>
+                    key.startsWith('hour_') && parseInt(key.split('_')[1]) === hour && value === employee
+                )
+            );
         }
 
         function assignTask(station, time, employeeName) {
@@ -408,7 +399,34 @@
             }
         }
 
-        function resetSchedule() {
+        document.getElementById('addStationBtn').addEventListener('click', () => {
+            const stationName = prompt('Enter station name:');
+            const groupName = prompt('Enter group for this station:');
+            const limit = parseInt(prompt('Enter limit for station (default 5):'), 10) || 5;
+
+            if (stationName) {
+                const stationData = { group: groupName, limit: limit };
+                set(ref(database, 'stations/' + stationName), stationData).then(loadStations);
+            }
+        });
+
+        document.getElementById('addEmployeeBtn').addEventListener('click', () => {
+            const name = document.getElementById('employeeName').value.trim();
+            const color = document.getElementById('employeeColor').value;
+
+            if (name && color) {
+                const employeeData = { available: true, color: color };
+                set(ref(database, 'employees/' + name), employeeData).then(() => {
+                    loadEmployees();
+                    document.getElementById('employeeName').value = '';
+                    document.getElementById('employeeColor').value = '';
+                });
+            } else {
+                alert('Please enter a valid name and select a shift color.');
+            }
+        });
+
+        document.getElementById('resetScheduleBtn').addEventListener('click', () => {
             const confirmReset = confirm("Are you sure you want to reset the schedule?");
             if (confirmReset) {
                 for (const station in stations) {
@@ -421,29 +439,7 @@
                 }
                 loadStations(); 
             }
-        }
-
-        document.getElementById('addStationBtn').addEventListener('click', () => {
-            const stationName = prompt('Enter station name:');
-            const groupName = prompt('Enter group for this station:');
-
-            if (stationName) {
-                const stationData = { group: groupName };
-                set(ref(database, 'stations/' + stationName), stationData).then(loadStations);
-            }
         });
-
-        document.getElementById('addEmployeeBtn').addEventListener('click', () => {
-            const name = document.getElementById('employeeName').value;
-            const color = document.getElementById('employeeColor').value;
-            if (name && color) {
-                const employeeData = { available: true, color: color };
-                set(ref(database, 'employees/' + name), employeeData).then(loadEmployees);
-                document.getElementById('employeeName').value = '';
-            }
-        });
-
-        document.getElementById('resetScheduleBtn').addEventListener('click', resetSchedule);
 
         window.addEventListener('load', () => {
             loadEmployees();
